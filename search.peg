@@ -1,0 +1,103 @@
+{
+    package search
+
+    import (
+        "github.com/gobwas/glob"
+        "github.com/sirupsen/logrus"
+        "strings"
+    )
+
+    type Node interface {
+        Evaluate(input map[string]string) (bool, error)
+    }
+
+    type Term struct {
+        node Node
+    }
+
+    func (t *Term) Evaluate(input map[string]string) (bool, error) {
+        return t.node.Evaluate(input)
+    }
+
+    type AndNode struct {
+        Left, Right Node
+    }
+
+    func (n *AndNode) Evaluate(input map[string]string) (bool, error) {
+        for _, node := range []Node{n.Left, n.Right} {
+            matched, err := node.Evaluate(input)
+            if err != nil {
+                return false, err
+            }
+            if !matched {
+                return false, nil
+            }
+        }
+        return true, nil
+    }
+
+    type Variable struct {
+        Field string
+        Value glob.Glob
+    }
+
+    func (v *Variable) Evaluate(input map[string]string) (bool, error) {
+        logrus.Debug(v)
+        if v.Value == nil {
+            return false, nil
+        }
+        return v.Value.Match(strings.ToLower(input[v.Field])), nil
+    }
+
+    func toString(v interface{}) string {
+        var sb strings.Builder
+        value := v.([]interface{})
+        for _, i := range(value) {
+            switch b := i.(type) {
+                case []byte:
+                    sb.WriteByte(b[0])
+                case []interface{}:
+                    sb.WriteString(toString(i))
+            }
+        }
+        return sb.String()
+    }
+}
+
+Input = t:Expression !. {
+    return t, nil
+}
+
+WS = ' '
+
+Expression = (
+    AndExpr /
+    Parenthetical /
+    Term
+)
+
+AndExpr = l:(Parenthetical / Term) WS+ `AND` WS+ r:Expression {
+    return &AndNode{l.(Node),r.(Node)}, nil
+}
+
+Parenthetical = '(' WS* e:Expression WS* ')' {
+    return e, nil
+}
+
+Term = left:BareValue ':' right:BareValue {
+    return &Variable{
+        Field: left.(string),
+        Value: glob.MustCompile(strings.ToLower(right.(string))),
+    }, nil
+}
+
+BareValue = bv:BareValueCharacter+ {
+    return toString(bv), nil
+}
+
+BareValueCharacter = (
+    [^ :()] /
+    `\:` { return []byte{':'}, nil } /
+    `\(` { return []byte{'('}, nil } /
+    `\)` { return []byte{')'}, nil }
+)
