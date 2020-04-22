@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
@@ -113,7 +113,7 @@ func init() {
 	deviceCmd.AddCommand(deviceGetCmd)
 	deviceCmd.AddCommand(deviceListCmd)
 	deviceCmd.AddCommand(deviceSearchCmd)
-	rootCmd.AddCommand(deviceCmd)
+	Root.AddCommand(deviceCmd)
 }
 
 type Node interface{}

@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -30,5 +30,5 @@ var entityGetCmd = &cobra.Command{
 
 func init() {
 	entityCmd.AddCommand(entityGetCmd)
-	rootCmd.AddCommand(entityCmd)
+	Root.AddCommand(entityCmd)
 }

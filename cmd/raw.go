@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ func init() {
 		"websocket endpoint; otherwise, send a GET")
 	rawCmd.Flags().StringArrayP("arg", "a", nil, "arguments to send along with the "+
 		"request, key=value pairs. provide multiple times for multiple argments.")
-	rootCmd.AddCommand(rawCmd)
+	Root.AddCommand(rawCmd)
 }
 
 type anyMessage struct {

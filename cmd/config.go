@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
@@ -39,7 +39,7 @@ func runConfigListFlows(cmd *cobra.Command, args []string) {
 
 func init() {
 	configCmd.AddCommand(configListEntriesCmd)
-	rootCmd.AddCommand(configCmd)
+	Root.AddCommand(configCmd)
 }
 
 func runConfigListEntries(cmd *cobra.Command, args []string) {
