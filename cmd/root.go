@@ -10,6 +10,9 @@ import (
 var Root = &cobra.Command{
 	Use:   "ghastly",
 	Short: "ghastly is a tool for interacting with homeassistant",
+	Long: "A pretty incomplete tool for interacting with HomeAssistant. Mainly intended for exploring the API and " +
+		"providing a test bed for the /api/ package. Future hopes includes developing a Terraform provider for " +
+		"HomeAssistant.\n\nDownloads available on the GitHub Releases page: https://github.com/pdbogen/ghastly/releases",
 }
 
 func init() {
