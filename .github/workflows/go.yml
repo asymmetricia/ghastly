@@ -21,12 +21,17 @@ jobs:
       run: |
         go get -v -t -d ./...
 
-    - name: Build
-      run: |
-        GOOS=windows GOARCH=amd64         go build -o ghastly.windows_amd64.exe -v .
-        GOOS=linux   GOARCH=amd64         go build -o ghastly.linux_amd64 -v .
-        GOOS=linux   GOARCH=arm   GOARM=5 go build -o ghastly.linux_arm5 -v .
-        GOOS=darwin  GOARCH=amd64         go build -o ghastly.darwin_amd64 -v .
+    - name: Generate
+      run: go generate ./...
+
+    - name: build linux
+      run: GOOS=linux   GOARCH=amd64         go build -o ghastly.linux_amd64 -v .
+    - name: build linux arm
+      run: GOOS=linux   GOARCH=arm   GOARM=5 go build -o ghastly.linux_arm5 -v .
+    - name: build windows
+      run: GOOS=windows GOARCH=amd64         go build -o ghastly.windows_amd64.exe -v .
+    - name: build darwin
+      run: GOOS=darwin  GOARCH=amd64         go build -o ghastly.darwin_amd64 -v .
     - name: Release
       id: create_release      
       uses: actions/create-release@v1
