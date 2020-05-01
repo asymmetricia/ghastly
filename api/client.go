@@ -21,6 +21,25 @@ type Client struct {
 	connection *websocket.Conn
 }
 
+func (c *Client) Post(path string, body io.Reader) (interface{}, error) {
+	path = strings.Trim(path, "/")
+	if !strings.HasPrefix(path, "api/") {
+		path = "api/" + path
+	}
+	haUrl, err := url.Parse(c.Server)
+	if err != nil {
+		return nil, fmt.Errorf("parsing %q as URL: %v", c.Server, err)
+	}
+	haUrl.Path += path
+
+	req, err := http.NewRequest("POST", haUrl.String(), body)
+	if err != nil {
+		return nil, fmt.Errorf("preparing POST request: %v", err)
+	}
+
+	return c.executeAndParse(req)
+}
+
 func (c *Client) Get(path string, parameters map[string]string) (interface{}, error) {
 	path = strings.Trim(path, "/")
 	if !strings.HasPrefix(path, "api/") {
@@ -39,6 +58,11 @@ func (c *Client) Get(path string, parameters map[string]string) (interface{}, er
 	if err != nil {
 		return nil, fmt.Errorf("preparing GET request: %v", err)
 	}
+
+	return c.executeAndParse(req)
+}
+
+func (c *Client) executeAndParse(req *http.Request) (interface{}, error) {
 	req.Header.Add("authorization", "Bearer "+c.Token)
 	req.Header.Add("content-type", "application/json")
 
