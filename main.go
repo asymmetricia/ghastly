@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/pdbogen/ghastly/cmd"
 	"os"
+
+	"github.com/pdbogen/ghastly/cmd"
 )
 
 func main() {

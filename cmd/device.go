@@ -3,9 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pdbogen/ghastly/search"
 	"os"
 	"strings"
+
+	"github.com/pdbogen/ghastly/search"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

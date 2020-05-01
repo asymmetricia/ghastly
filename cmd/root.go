@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"github.com/pdbogen/ghastly/api"
 	"os"
+
+	"github.com/pdbogen/ghastly/api"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

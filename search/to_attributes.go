@@ -50,7 +50,8 @@ func Attributes(obj interface{}) (map[string]string, error) {
 		return ret, nil
 	case reflect.String:
 		return map[string]string{"": val.String()}, nil
-	case reflect.Slice: fallthrough
+	case reflect.Slice:
+		fallthrough
 	case reflect.Array:
 		ret := map[string]string{}
 		for i := 0; i < val.Len(); i++ {

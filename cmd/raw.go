@@ -3,9 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 var rawCmd = &cobra.Command{
