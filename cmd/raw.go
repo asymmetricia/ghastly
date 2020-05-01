@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pdbogen/ghastly/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"strings"
@@ -40,7 +39,6 @@ func (a *anyMessage) Type() string {
 }
 
 func runRaw(cmd *cobra.Command, args []string) {
-	client := &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
 	ws, _ := cmd.Flags().GetBool("websocket")
 	reqArgsList, _ := cmd.Flags().GetStringArray("arg")
 
@@ -54,9 +52,9 @@ func runRaw(cmd *cobra.Command, args []string) {
 	var err error
 	if ws {
 		msg := &anyMessage{msgType: args[0], args: reqArgs}
-		result, err = client.RawWebsocketRequest(msg)
+		result, err = client(cmd).RawWebsocketRequest(msg)
 	} else {
-		result, err = client.RawRESTRequest(args[0], reqArgs)
+		result, err = client(cmd).RawRESTRequest(args[0], reqArgs)
 	}
 	if err != nil {
 		logrus.WithError(err).Fatal("could not send request")

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pdbogen/ghastly/api"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +17,7 @@ var entityGetCmd = &cobra.Command{
 	Short: "retrieve all known information about the given entity ID",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		client := &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
-		entity, err := client.GetEntity(args[0])
+		entity, err := client(cmd).GetEntity(args[0])
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

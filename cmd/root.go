@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/pdbogen/ghastly/api"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -13,6 +14,10 @@ var Root = &cobra.Command{
 	Long: "A pretty incomplete tool for interacting with HomeAssistant. Mainly intended for exploring the API and " +
 		"providing a test bed for the /api/ package. Future hopes includes developing a Terraform provider for " +
 		"HomeAssistant.\n\nDownloads available on the GitHub Releases page: https://github.com/pdbogen/ghastly/releases",
+}
+
+func client(cmd *cobra.Command) *api.Client {
+	return &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
 }
 
 func init() {

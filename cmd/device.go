@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pdbogen/ghastly/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -32,8 +31,6 @@ var deviceSearchCmd = &cobra.Command{
 }
 
 func runDeviceSearch(cmd *cobra.Command, args []string) {
-	client := &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
-
 	qs := strings.Join(args, " ")
 	log := logrus.WithField("query", qs)
 	queryI, err := search.Parse("query", []byte(qs))
@@ -46,7 +43,7 @@ func runDeviceSearch(cmd *cobra.Command, args []string) {
 		log.Fatalf("query parser returned nil error, but query was %T not search.Node", query)
 	}
 
-	devices, err := client.ListDevices()
+	devices, err := client(cmd).ListDevices()
 	if err != nil {
 		log.WithError(err).Fatal("could not get devices from HomeAssistant")
 	}
@@ -70,8 +67,7 @@ func runDeviceSearch(cmd *cobra.Command, args []string) {
 }
 
 func runDeviceList(cmd *cobra.Command, args []string) {
-	client := &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
-	devices, err := client.ListDevices()
+	devices, err := client(cmd).ListDevices()
 	if err != nil {
 		logrus.WithError(err).Fatal("could not get devices from HomeAssistant")
 	}
@@ -88,8 +84,7 @@ var deviceGetCmd = &cobra.Command{
 
 func runDeviceGetCmd(cmd *cobra.Command, args []string) {
 	log := logrus.WithField("command", "device get")
-	client := &api.Client{Token: cmd.Flag("token").Value.String(), Server: cmd.Flag("server").Value.String()}
-	devices, err := client.ListDevices()
+	devices, err := client(cmd).ListDevices()
 	if err != nil {
 		log.Fatal(err)
 	}
