@@ -53,20 +53,56 @@ func process(resultInterface interface{}, err error) (interface{}, error) {
 	return result.Result, nil
 }
 
-// RawRESTRequest requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// RawRESTGet requests the given path via the REST API and returns the JSON-decoded request body if everything goes
 // well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
 // will be non-nil.
 // Note that the returned interface will be generically typed (e.g., maps & slices). See RawRESTRequestAs.
-func (c *Client) RawRESTRequest(path string, parameters map[string]string) (interface{}, error) {
+func (c *Client) RawRESTGet(path string, parameters map[string]interface{}) (interface{}, error) {
 	return process(c.Get(path, parameters))
 }
 
-// RawRESTRequest requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// RawRESTGetAs requests the given path via the REST API and returns the JSON-decoded request body if everything goes
 // well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
 // will be non-nil.
 // The returned interface will be the same type as the given prototype. If conversion cannot be achieved, an error will
 // be returned.
-func (c *Client) RawRESTRequestAs(path string, parameters map[string]string, prototype interface{}) (interface{}, error) {
+func (c *Client) RawRESTGetAs(path string, parameters map[string]interface{}, prototype interface{}) (interface{}, error) {
 	obj, err := process(c.Get(path, parameters))
+	return convert(obj, prototype, err)
+}
+
+// RawRESTPost requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
+// will be non-nil.
+// Note that the returned interface will be generically typed (e.g., maps & slices). See RawRESTRequestAs.
+func (c *Client) RawRESTPost(path string, parameters map[string]interface{}) (interface{}, error) {
+	return process(c.Post(path, parameters))
+}
+
+// RawRESTPostAs requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
+// will be non-nil.
+// The returned interface will be the same type as the given prototype. If conversion cannot be achieved, an error will
+// be returned.
+func (c *Client) RawRESTPostAs(path string, parameters map[string]interface{}, prototype interface{}) (interface{}, error) {
+	obj, err := process(c.Post(path, parameters))
+	return convert(obj, prototype, err)
+}
+
+// RawRESTDelete requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
+// will be non-nil.
+// Note that the returned interface will be generically typed (e.g., maps & slices). See RawRESTRequestAs.
+func (c *Client) RawRESTDelete(path string, parameters map[string]interface{}) (interface{}, error) {
+	return process(c.Delete(path, parameters))
+}
+
+// RawRESTDeleteAs requests the given path via the REST API and returns the JSON-decoded request body if everything goes
+// well. If anything else happens (failure communicating, rejected request, etc.) the result will be nil and the error
+// will be non-nil.
+// The returned interface will be the same type as the given prototype. If conversion cannot be achieved, an error will
+// be returned.
+func (c *Client) RawRESTDeleteAs(path string, parameters map[string]interface{}, prototype interface{}) (interface{}, error) {
+	obj, err := process(c.Delete(path, parameters))
 	return convert(obj, prototype, err)
 }

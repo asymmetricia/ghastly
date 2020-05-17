@@ -1,12 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"strings"
@@ -21,26 +23,26 @@ type Client struct {
 	connection *websocket.Conn
 }
 
-func (c *Client) Post(path string, body io.Reader) (interface{}, error) {
-	path = strings.Trim(path, "/")
-	if !strings.HasPrefix(path, "api/") {
-		path = "api/" + path
+// RawJSON sends a request using the given method (e.g., GET, POST, DELETE) to the given nominal path. Parameters
+// describe URL parameters that are added to the URL, and may be `nil`. body is an object that's converted to JSON and
+// supplied as the request body. No request body is supplied if `body` is nil.
+//
+// Returns the generally JSON-decoded response object, or error, if something happens. (Including, e.g., non-2XX
+// responses or a body that isn't parseable JSON).
+func (c *Client) RawJSON(method string, path string, parameters map[string]interface{}, body interface{}) (interface{}, error) {
+	var rdr io.Reader
+	if body != nil {
+		j, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("could not marshal body %T as JSON: %v", body, err)
+		}
+		rdr = bytes.NewBuffer(j)
 	}
-	haUrl, err := url.Parse(c.Server)
-	if err != nil {
-		return nil, fmt.Errorf("parsing %q as URL: %v", c.Server, err)
-	}
-	haUrl.Path += path
-
-	req, err := http.NewRequest("POST", haUrl.String(), body)
-	if err != nil {
-		return nil, fmt.Errorf("preparing POST request: %v", err)
-	}
-
-	return c.executeAndParse(req)
+	return c.Raw(method, path, parameters, rdr)
 }
 
-func (c *Client) Get(path string, parameters map[string]string) (interface{}, error) {
+// Raw is as RawJSON, above, except the body is expected to already be an io.Reader.
+func (c *Client) Raw(method string, path string, parameters map[string]interface{}, body io.Reader) (interface{}, error) {
 	path = strings.Trim(path, "/")
 	if !strings.HasPrefix(path, "api/") {
 		path = "api/" + path
@@ -51,26 +53,60 @@ func (c *Client) Get(path string, parameters map[string]string) (interface{}, er
 	}
 	haUrl.Path += path
 	for k, v := range parameters {
-		haUrl.Query().Set(k, v)
+		vs, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("REST requests only accept string-value parameters, but %q was %T", k, v)
+		}
+		haUrl.Query().Set(k, vs)
 	}
 
-	req, err := http.NewRequest("GET", haUrl.String(), nil)
+	req, err := http.NewRequest(method, haUrl.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("preparing GET request: %v", err)
+		return nil, fmt.Errorf("preparing %q request: %v", method, err)
 	}
 
 	return c.executeAndParse(req)
+}
+
+// Delete renders `body` as JSON and posts it to the given path.
+func (c *Client) Delete(path string, body interface{}) (interface{}, error) {
+	return c.RawJSON("DELETE", path, nil, body)
+}
+
+// Post renders `body` as JSON and posts it to the given path.
+func (c *Client) Post(path string, body interface{}) (interface{}, error) {
+	return c.RawJSON("POST", path, nil, body)
+}
+
+func (c *Client) Get(path string, parameters map[string]interface{}) (interface{}, error) {
+	return c.Raw("GET", path, parameters, nil)
 }
 
 func (c *Client) executeAndParse(req *http.Request) (interface{}, error) {
 	req.Header.Add("authorization", "Bearer "+c.Token)
 	req.Header.Add("content-type", "application/json")
 
+	reqBytes, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		panic("could not dump request: " + err.Error())
+	}
+	for _, line := range strings.Split(string(reqBytes), "\n") {
+		logrus.Tracef("sent: %q", strings.TrimSpace(line))
+	}
+
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending GET request: %v", err)
 	}
 	defer res.Body.Close()
+
+	resBytes, err := httputil.DumpResponse(res, true)
+	if err != nil {
+		panic("could not dump response: " + err.Error())
+	}
+	for _, line := range strings.Split(string(resBytes), "\n") {
+		logrus.Tracef("recv: %q", strings.TrimSpace(line))
+	}
 
 	if res.StatusCode/100 != 2 {
 		bb, _ := ioutil.ReadAll(res.Body)
