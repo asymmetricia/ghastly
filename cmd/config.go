@@ -32,7 +32,7 @@ var configListEntriesCmd = &cobra.Command{
 
 var configListFlowsCmd = &cobra.Command{
 	Use:   "list-flows",
-	Short: "retrieve a list of all known config flows",
+	Short: "list in-progress but not started config flows",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ret, err := client(cmd).ListConfigFlowProgress()
@@ -55,6 +55,20 @@ var configGetFlowCmd = &cobra.Command{
 		}
 		retJson, _ := json.Marshal(ret)
 		fmt.Println(string(retJson))
+	},
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) (i []string, directive cobra.ShellCompDirective) {
+		flows, err := client(cmd).ListConfigFlowProgress()
+		if err != nil {
+			logrus.WithError(err).Error("could not list flows")
+			return nil, cobra.ShellCompDirectiveError | cobra.ShellCompDirectiveNoFileComp
+		}
+		var ret []string
+		for _, flow := range flows {
+			if strings.HasPrefix(string(flow.FlowId), toComplete) {
+				ret = append(ret, string(flow.FlowId))
+			}
+		}
+		return ret, cobra.ShellCompDirectiveNoFileComp
 	},
 }
 
@@ -93,14 +107,14 @@ var configSetFlowCmd = &cobra.Command{
 			case "integer":
 				i, err := strconv.Atoi(kv[field.Name])
 				if err != nil {
-					log.WithError(err).Fatal("field %q expected integer, but %q could not be parsed as integer",
+					log.WithError(err).Fatalf("field %q expected integer, but %q could not be parsed as integer",
 						field.Name, kv[field.Name])
 				}
 				payload[field.Name] = i
 			case "boolean":
 				b, err := strconv.ParseBool(kv[field.Name])
 				if err != nil {
-					log.WithError(err).Fatal("Field %q expected boolean, but %q could not be parsed as bool",
+					log.WithError(err).Fatalf("Field %q expected boolean, but %q could not be parsed as bool",
 						field.Name, kv[field.Name])
 				}
 				payload[field.Name] = b
@@ -111,10 +125,53 @@ var configSetFlowCmd = &cobra.Command{
 
 		log.Debugf("prepared payload: %v", payload)
 
-		if err := client(cmd).SetFlow(id, payload); err != nil {
+		result, err := client(cmd).SetFlow(id, payload)
+		if err != nil {
 			log.WithError(err).Fatal("set-flow failed")
 		}
-		log.Print("set successful")
+		log.WithField("result", result).Print("set successful")
+	},
+}
+
+var configStartOptionsFlowCmd = &cobra.Command{
+	Use:   "start-options-flow [handler-id]",
+	Short: "start a config flow with with the given handler ID as the handler",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ret, err := client(cmd).StartOptionsFlow(api.EntryId(args[0]))
+		if err != nil {
+			logrus.WithError(err).Fatal("start-flow failed")
+		}
+		retJson, _ := json.Marshal(ret)
+		fmt.Println(string(retJson))
+	},
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		entries, err := client(cmd).ListConfigEntries()
+		if err != nil {
+			logrus.WithError(err).Error("could not list config entries")
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var ret []string
+		for _, entry := range entries {
+			if strings.HasPrefix(string(entry.EntryId), toComplete) {
+				ret = append(ret, string(entry.EntryId))
+			}
+		}
+		return ret, cobra.ShellCompDirectiveNoFileComp
+	},
+}
+
+var configGetOptionsFlowCmd = &cobra.Command{
+	Use:   "get-options-flow [flow-id]",
+	Short: "retrieve the current state of the indicated options flow",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ret, err := client(cmd).GetOptionsFlow(api.ConfigFlowId(args[0]))
+		if err != nil {
+			logrus.WithError(err).Fatal("get-options-flow failed")
+		}
+		retJson, _ := json.Marshal(ret)
+		fmt.Println(string(retJson))
 	},
 }
 
@@ -132,11 +189,28 @@ var configGetConfigCmd = &cobra.Command{
 	},
 }
 
+var configListFlowHandlersCmd = &cobra.Command{
+	Use:   "list-flow-handlers",
+	Short: "returns a list of flow handlers, whatever those are",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, _ []string) {
+		ret, err := client(cmd).ListFlowHandlers()
+		if err != nil {
+			logrus.WithError(err).Fatal("could not list flow handlers")
+		}
+		retJson, _ := json.Marshal(ret)
+		fmt.Println(string(retJson))
+	},
+}
+
 func init() {
 	configCmd.AddCommand(configListEntriesCmd,
+		configListFlowHandlersCmd,
 		configListFlowsCmd,
 		configGetFlowCmd,
 		configGetConfigCmd,
-		configSetFlowCmd)
+		configGetOptionsFlowCmd,
+		configSetFlowCmd,
+		configStartOptionsFlowCmd)
 	Root.AddCommand(configCmd)
 }
