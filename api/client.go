@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,15 +14,16 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-
-	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
+	"sync"
 )
 
+// Client is the object used to interface with a homeassistant server. It should not be copied after being created.
 type Client struct {
-	Token      string
-	Server     string
-	connection *websocket.Conn
+	Token        string
+	Server       string
+	connection   *websocket.Conn
+	connectionMu sync.Mutex
+	messageIndex int
 }
 
 // RawJSON sends a request using the given method (e.g., GET, POST, DELETE) to the given nominal path. Parameters
@@ -170,7 +173,7 @@ func (c *Client) connect() error {
 	}
 
 	logrus.Debug("expecting auth_required...")
-	msg, err := c.Exchange(nil)
+	msg, err := c.receive()
 	if err != nil {
 		return fmt.Errorf("handshaking: %v", err)
 	}
@@ -178,10 +181,12 @@ func (c *Client) connect() error {
 		return fmt.Errorf("message was %T, not *AuthRequiredMessage", msg)
 	}
 
-	msg, err = c.Exchange(AuthMessage{AccessToken: c.Token})
+	err = c.send(AuthMessage{AccessToken: c.Token})
 	if err != nil {
 		return fmt.Errorf("authenticating: %v", err)
 	}
+
+	msg, err = c.receive()
 	switch m := msg.(type) {
 	case *AuthOkMessage:
 		return nil
@@ -192,34 +197,9 @@ func (c *Client) connect() error {
 	}
 }
 
-func (c *Client) Exchange(send Message) (Message, error) {
-	if c.connection == nil {
-		if err := c.connect(); err != nil {
-			return nil, fmt.Errorf("connecting: %v", err)
-		}
-	}
-
-	if send != nil {
-		logrus.Debugf("sending: %s", send.Type())
-		data, err := json.Marshal(send)
-		if err != nil {
-			return nil, fmt.Errorf("marshaling frame: %v", err)
-		}
-		// don't @ me
-		var obj map[string]interface{}
-		_ = json.Unmarshal(data, &obj)
-		obj["type"] = send.Type()
-		if _, ok := send.(AuthMessage); !ok {
-			obj["id"] = 1
-		}
-		data, _ = json.Marshal(obj)
-
-		logrus.Tracef("sending: %s", string(data))
-		if err := c.connection.WriteMessage(websocket.TextMessage, data); err != nil {
-			return nil, fmt.Errorf("sending: %v", err)
-		}
-	}
-
+// receive receives a single message via the websocket and returns the parsed result, or an error if it could not be
+// received or not parsed.
+func (c *Client) receive() (Message, error) {
 	_, data, err := c.connection.ReadMessage()
 	if err != nil {
 		return nil, fmt.Errorf("reading: %v", err)
@@ -231,6 +211,52 @@ func (c *Client) Exchange(send Message) (Message, error) {
 	}
 	logrus.Debugf("    got: %s", ret.Type())
 	return ret, nil
+}
+
+func (c *Client) send(send Message) error {
+	if send == nil {
+		return fmt.Errorf("cannot send nil message")
+	}
+	logrus.Debugf("sending: %s", send.Type())
+	data, err := json.Marshal(send)
+	if err != nil {
+		return fmt.Errorf("marshaling frame: %w", err)
+	}
+
+	// don't @ me
+	var obj map[string]interface{}
+	_ = json.Unmarshal(data, &obj)
+	obj["type"] = send.Type()
+	if _, ok := send.(AuthMessage); !ok {
+		c.messageIndex++
+		obj["id"] = c.messageIndex
+	}
+	data, _ = json.Marshal(obj)
+
+	logrus.Tracef("sending: %s", string(data))
+	if err := c.connection.WriteMessage(websocket.TextMessage, data); err != nil {
+		return fmt.Errorf("sending: %w", err)
+	}
+	return nil
+}
+
+// Exchange exchanges the 'send' Message for a response. It is safe for use by multiple goroutines.
+func (c *Client) Exchange(send Message) (Message, error) {
+	c.connectionMu.Lock()
+	defer c.connectionMu.Unlock()
+
+	// establish a new connection if needed
+	if c.connection == nil {
+		if err := c.connect(); err != nil {
+			return nil, fmt.Errorf("connecting: %v", err)
+		}
+	}
+
+	if err := c.send(send); err != nil {
+		return nil, err
+	}
+
+	return c.receive()
 }
 
 type Message interface {
