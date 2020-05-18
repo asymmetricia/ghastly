@@ -7,7 +7,8 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     steps:
-    - name: Release
+    - id: create_release
+      name: Release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
