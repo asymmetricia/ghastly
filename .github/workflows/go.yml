@@ -3,36 +3,28 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  strategy:
+    matrix:
+      arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-
     - name: Set up Go 1.14
       uses: actions/setup-go@v1
       with:
         go-version: 1.14
-      id: go
-
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
-
-    - name: Get dependencies
+    - name: build
       run: |
         go get -v -t -d ./...
-
-    - name: Generate
-      run: go generate ./...
-
-    - name: build linux
-      run: |
-        for arch in linux_amd64 linux_arm windows_amd64 darwin_amd64; do
-          export GOOS=${arch%%_*} GOARCH=${arch##*_} GOARM=5
-          go build -o ghastly.$arch -v --ldflags="-s" .
-          go build -o terraform-provider-homeassistant.$arch -v .
-        done
+        go generate ./...
+        arch=${{matrix.arch}}
+        export GOOS=${arch%%_*} GOARCH=${arch##*_} GOARM=5
+        go build -o ghastly.$arch -v --ldflags="-s" .
+        go build -o terraform-provider-homeassistant.$arch -v .
     - name: Release
-      id: create_release      
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
@@ -41,83 +33,12 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-    - name: upload windows_amd64
-      id: upload-release-asset-windows_amd64
+    - name: upload
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./ghastly.windows_amd64.exe
-        asset_name: ghastly.windows_amd64.exe
-        asset_content_type: application/octet-stream
-    - name: upload linux_amd64
-      id: upload-release-asset-linux_amd64
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./ghastly.linux_amd64
-        asset_name: ghastly.linux_amd64
-        asset_content_type: application/octet-stream
-    - name: upload linux_arm5
-      id: upload-release-asset-linux_arm5
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./ghastly.linux_arm5
-        asset_name: ghastly.linux_arm5
-        asset_content_type: application/octet-stream
-    - name: upload darwin_amd64
-      id: upload-release-asset-darwin_amd64
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./ghastly.darwin_amd64
-        asset_name: ghastly.darwin_amd64
-        asset_content_type: application/octet-stream
-    - name: upload terraform windows_amd64
-      id: upload-release-asset-windows_amd64
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./terraform-provider-homeassistant.windows_amd64.exe
-        asset_name: terraform-provider-homeassistant.windows_amd64.exe
-        asset_content_type: application/octet-stream
-    - name: upload terraform linux_amd64
-      id: upload-release-asset-linux_amd64
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./terraform-provider-homeassistant.linux_amd64
-        asset_name: terraform-provider-homeassistant.linux_amd64
-        asset_content_type: application/octet-stream
-    - name: upload terraform linux_arm5
-      id: upload-release-asset-linux_arm5
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./terraform-provider-homeassistant.linux_arm5
-        asset_name: terraform-provider-homeassistant.linux_arm5
-        asset_content_type: application/octet-stream
-    - name: upload terraform darwin_amd64
-      id: upload-release-asset-darwin_amd64
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./terraform-provider-homeassistant.darwin_amd64
-        asset_name: terraform-provider-homeassistant.darwin_amd64
+        asset_path: ./ghastly.${{matrix.arch}}
+        asset_name: ghastly.${{matrix.arch}}
         asset_content_type: application/octet-stream
