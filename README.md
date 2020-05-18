@@ -1,1 +1,1 @@
-ghastly.md
+./docs/ghastly.md
