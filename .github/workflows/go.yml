@@ -3,7 +3,23 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
   build:
+    needs: release
     strategy:
       matrix:
         arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
@@ -24,21 +40,12 @@ jobs:
         export GOOS=${arch%%_*} GOARCH=${arch##*_} GOARM=5
         go build -o ghastly.$arch -v --ldflags="-s" .
         go build -o terraform-provider-homeassistant.$arch -v .
-    - name: Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
     - name: upload
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ needs.release.outputs.upload_url }}
         asset_path: ./ghastly.${{matrix.arch}}
         asset_name: ghastly.${{matrix.arch}}
         asset_content_type: application/octet-stream
