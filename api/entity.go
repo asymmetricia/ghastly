@@ -1,10 +1,7 @@
 package api
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/sirupsen/logrus"
 )
 
 type EntityListMessage struct{}
@@ -22,28 +19,26 @@ func init() {
 }
 
 type Entity struct {
-	ConfigEntryId string  `json:"config_entry_id,omitempty"`
-	DeviceId      string  `json:"device_id,omitempty"`
-	DisabledBy    *string `json:"disabled_by,omitempty"`
-	EntityId      string  `json:"entity_id,omitempty"`
-	Platform      string  `json:"platform,omitempty"`
-	Name          string  `json:"name,omitempty"`
+	ConfigEntryId string `json:"config_entry_id,omitempty"`
+	DeviceId      string `json:"device_id,omitempty"`
+	DisabledBy    string `json:"disabled_by,omitempty"`
+	EntityId      string `json:"entity_id,omitempty"`
+	Platform      string `json:"platform,omitempty"`
+	Name          string `json:"name,omitempty"`
 }
 
 func (c *Client) GetEntity(id string) (*Entity, error) {
-	retI, err := c.Exchange(EntityGetMessage{id})
+	entityI, err := c.RawWebsocketRequestAs(EntityGetMessage{id}, (*Entity)(nil))
 	if err != nil {
 		return nil, err
 	}
-	ret, ok := retI.(*ResultMessage)
+
+	entity, ok := entityI.(*Entity)
 	if !ok {
-		return nil, fmt.Errorf("server sent %T, not result", retI)
+		return nil, fmt.Errorf("server sent %T, not *Entity", entityI)
 	}
-	if !ret.Success {
-		return nil, fmt.Errorf("get unsuccessful: %v", ret.Error)
-	}
-	logrus.Debug(ret)
-	return nil, errors.New("unimplemented")
+
+	return entity, nil
 }
 
 type EntityList struct{}
@@ -60,4 +55,16 @@ func (c *Client) ListEntities() ([]Entity, error) {
 	}
 
 	return entities, nil
+}
+
+type EntityRename struct {
+	EntityId string `json:"entity_id"`
+	Name     string `json:"name"`
+}
+
+func (EntityRename) Type() string { return "config/entity_registry/update" }
+
+func (c *Client) SetEntityName(id string, name string) error {
+	_, err := c.RawWebsocketRequest(EntityRename{EntityId: id, Name: name})
+	return err
 }

@@ -42,7 +42,18 @@ var entityListCmd = &cobra.Command{
 	},
 }
 
+var entityRenameCmd = &cobra.Command{
+	Use:   "rename [entity-id] [new-name]",
+	Short: "rename an entity given by [entity-id] to have the friendly name given by [new-name]",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := client(cmd).SetEntityName(args[0], args[1]); err != nil {
+			logrus.Fatal(err)
+		}
+	},
+}
+
 func init() {
-	entityCmd.AddCommand(entityGetCmd, entityListCmd)
+	entityCmd.AddCommand(entityGetCmd, entityListCmd, entityRenameCmd)
 	Root.AddCommand(entityCmd)
 }
