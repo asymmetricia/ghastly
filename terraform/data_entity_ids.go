@@ -5,59 +5,34 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/pdbogen/ghastly/api"
+	"reflect"
 	"strings"
 )
 
 func dataEntityIds() *schema.Resource {
-	return &schema.Resource{
-		Schema: map[string]*schema.Schema{
-			"device_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"platform": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"prefix": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
+	entitySchema := entityFilter()
 
-			"entity_ids": {
-				Type:     schema.TypeSet,
-				Computed: true,
-				Elem:     &schema.Schema{Type: schema.TypeString},
-			},
-		},
+	entitySchema["entity_ids"] = &schema.Schema{
+		Type:     schema.TypeSet,
+		Elem:     &schema.Schema{Type: schema.TypeString},
+		Computed: true,
+	}
+
+	return &schema.Resource{
+		Schema: entitySchema,
 		Read: func(data *schema.ResourceData, i interface{}) error {
-			client := i.(*api.Client)
-			entities, err := client.ListEntities()
+			entities, err := getMatchingEntities(data, i)
 			if err != nil {
 				return fmt.Errorf("listing entities: %w", err)
 			}
 
-			deviceId := data.Get("device_id").(string)
-			platform := data.Get("platform").(string)
-			prefix := data.Get("prefix").(string)
-
 			var entityIds []string
 			for _, entity := range entities {
-				if len(deviceId) > 0 && entity.DeviceId != deviceId {
-					continue
-				}
-				if len(platform) > 0 && entity.Platform != platform {
-					continue
-				}
-				if len(prefix) > 0 && !strings.HasPrefix(entity.EntityId, prefix) {
-					continue
-				}
 				entityIds = append(entityIds, entity.EntityId)
 			}
 
-			data.SetId(hashcode.Strings([]string{deviceId, platform, prefix}))
+			data.SetId(hashcode.Strings(entityIds))
 			data.Set("entity_ids", entityIds)
-
 			return nil
 		},
 	}

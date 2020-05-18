@@ -1,114 +1,107 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/pdbogen/ghastly/api"
-	"strconv"
+	"github.com/pkg/errors"
+	"reflect"
 	"strings"
 )
 
-func dataEntity() *schema.Resource {
-	return &schema.Resource{
-		Schema: map[string]*schema.Schema{
-			"entity_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			"entity_id_prefix": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"config_entry_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			"device_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			"disabled_by": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			"platform": {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
+func entityFilter() map[string]*schema.Schema {
+	entitySchema := map[string]*schema.Schema{
+		// bonus input
+		"entity_id_prefix": {
+			Type:        schema.TypeString,
+			Computed:    true,
+			Optional:    true,
+			Description: "match entities whose entity_id has this prefix",
 		},
+	}
+
+	typ := reflect.TypeOf(api.Entity{})
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		jsonName := strings.Split(field.Tag.Get("json"), ",")[0]
+		entitySchema[jsonName] = &schema.Schema{
+			Type:        schema.TypeString,
+			Computed:    true,
+			Optional:    true,
+			Description: fmt.Sprintf("match against the entity %q field", jsonName),
+		}
+	}
+
+	return entitySchema
+}
+
+func getMatchingEntities(data *schema.ResourceData, i interface{}) ([]api.Entity, error) {
+	client := i.(*api.Client)
+	entities, err := client.ListEntities()
+	if err != nil {
+		return nil, fmt.Errorf("listing entities: %w", err)
+	}
+
+	typ := reflect.TypeOf(api.Entity{})
+
+	var filtered []api.Entity
+entities:
+	for _, entity := range entities {
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			attrName := strings.Split(field.Tag.Get("json"), ",")[0]
+			attr, _ := data.Get(attrName).(string)
+			if len(attr) == 0 {
+				continue
+			}
+
+			actual := reflect.ValueOf(entity).Field(i).String()
+			if actual != attr {
+				continue entities
+			}
+		}
+
+		entityIdPrefix, _ := data.Get("entity_id_prefix").(string)
+		if entityIdPrefix != "" && !strings.HasPrefix(entity.EntityId, entityIdPrefix) {
+			continue
+		}
+
+		filtered = append(filtered, entity)
+	}
+
+	return filtered, nil
+}
+
+func dataEntity() *schema.Resource {
+	entitySchema := entityFilter()
+
+	return &schema.Resource{
+		Schema: entitySchema,
 		Read: func(data *schema.ResourceData, i interface{}) error {
-			client := i.(*api.Client)
-			entities, err := client.ListEntities()
+			entities, err := getMatchingEntities(data, i)
 			if err != nil {
-				return fmt.Errorf("getting eneity list: %w", err)
+				return err
 			}
 
-			var filteredEntities []api.Entity
-
-			for _, entity := range entities {
-				if eid := data.Get("entity_id").(string); eid != "" && entity.EntityId != eid {
-					continue
-				}
-				if eidPre := data.Get("entity_id_prefix").(string); eidPre != "" && !strings.HasPrefix(entity.EntityId, eidPre) {
-					continue
-				}
-				if confId := data.Get("config_entry_id").(string); confId != "" && entity.ConfigEntryId != confId {
-					continue
-				}
-				if devId := data.Get("device_id").(string); devId != "" && entity.DeviceId != devId {
-					continue
-				}
-				if disBy := data.Get("disabled_by").(string); disBy != "" && entity.DisabledBy != disBy {
-					continue
-				}
-				if name := data.Get("name").(string); name != "" && entity.Name != name {
-					continue
-				}
-				if platform := data.Get("platform").(string); platform != "" && entity.Platform != platform {
-					continue
-				}
-				filteredEntities = append(filteredEntities, entity)
-			}
-
-			if len(filteredEntities) == 0 {
+			if len(entities) < 1 {
 				return errors.New("no match")
 			}
-			if len(filteredEntities) > 1 {
-				return errors.New("too many matches; consider narrowing parameters")
+
+			if len(entities) > 1 {
+				return errors.New("too many matches")
 			}
 
-			entity := filteredEntities[0]
+			val := reflect.ValueOf(entities[0])
+			typ := val.Type()
+			for i := 0; i < typ.NumField(); i++ {
+				data.Set(
+					strings.Split(typ.Field(i).Tag.Get("json"), ",")[0],
+					val.Field(i).String(),
+				)
+			}
 
-			data.SetId(strconv.Itoa(hashcode.String(entity.EntityId)))
-			err = data.Set("entity_id", entity.EntityId)
-			if err == nil {
-				err = data.Set("config_entry_id", entity.ConfigEntryId)
-			}
-			if err == nil {
-				err = data.Set("device_id", entity.DeviceId)
-			}
-			if err == nil {
-				err = data.Set("disabled_by", entity.DisabledBy)
-			}
-			if err == nil {
-				err = data.Set("name", entity.Name)
-			}
-			if err == nil {
-				err = data.Set("platform", entity.Platform)
-			}
-			return err
+			data.SetId(entities[0].EntityId)
+			return nil
 		},
 	}
 }
