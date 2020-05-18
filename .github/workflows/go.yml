@@ -3,24 +3,7 @@ on:
   push:
     tags: ["v*"]
 jobs:
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    steps:
-    - id: create_release
-      name: Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
   build:
-    needs: release
     strategy:
       matrix:
         arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
@@ -41,12 +24,52 @@ jobs:
         export GOOS=${arch%%_*} GOARCH=${arch##*_} GOARM=5
         go build -o ghastly.$arch -v --ldflags="-s" .
         go build -o terraform-provider-homeassistant.$arch -v .
-    - name: upload
+    - name: upload-artifact ghastly
+      uses: actions/upload-artifact@v1
+      with:
+        name: ghastly.${{matrix.arch}}
+        path: ghastly.${{matrix.arch}}
+    - name: upload-artifact terraform-provider-homeassistant
+      uses: actions/upload-artifact@v1
+      with:
+        name: terraform-provider-homeassistant.${{matrix.arch}}
+        path: terraform-provider-homeassistant.${{matrix.arch}}
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - id: create_release
+      name: Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+  assets:
+    name: Upload Assets
+    runs-on: ubuntu-latest
+    needs: release
+    strategy:
+      matrix:
+        arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
+        artifact: [ghastly,terraform-provider-homeassistant]
+    steps:
+    - name: download ${{artifact}}.${{arch}}
+      uses: actions/download-artifact@v1
+      with:
+        name: ${{artifact}}.${{arch}}
+    - name: upload ${{artifact}}.${{arch}} to release
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.release.outputs.upload_url }}
-        asset_path: ./ghastly.${{matrix.arch}}
-        asset_name: ghastly.${{matrix.arch}}
+        asset_path: ${{artifact}}.${{arch}}
+        asset_name: ${{artifact}}.${{arch}}
         asset_content_type: application/octet-stream
