@@ -60,16 +60,16 @@ jobs:
         arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
         artifact: [ghastly,terraform-provider-homeassistant]
     steps:
-    - name: download ${{artifact}}.${{arch}}
+    - name: download ${{matrix.artifact}}.${{matrix.arch}}
       uses: actions/download-artifact@v1
       with:
-        name: ${{artifact}}.${{arch}}
-    - name: upload ${{artifact}}.${{arch}} to release
+        name: ${{matrix.artifact}}.${{matrix.arch}}
+    - name: upload ${{matrix.artifact}}.${{matrix.arch}} to release
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.release.outputs.upload_url }}
-        asset_path: ${{artifact}}.${{arch}}
-        asset_name: ${{artifact}}.${{arch}}
+        asset_path: ${{matrix.artifact}}.${{matrix.arch}}
+        asset_name: ${{matrix.artifact}}.${{matrix.arch}}
         asset_content_type: application/octet-stream
