@@ -3,10 +3,10 @@ on:
   push:
     tags: ["v*"]
 jobs:
-  strategy:
-    matrix:
-      arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
   build:
+    strategy:
+      matrix:
+        arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
     name: Build
     runs-on: ubuntu-latest
     steps:
