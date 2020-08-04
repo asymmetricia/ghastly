@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -38,6 +39,12 @@ var entityListCmd = &cobra.Command{
 		switch o, _ := cmd.Flags().GetString("output"); o {
 		case "text":
 			printTable(entities)
+		case "json":
+			jb, err := json.Marshal(entities)
+			if err != nil {
+				logrus.WithError(err).Fatal("could not marshal entity list to JSON")
+			}
+			fmt.Println(string(jb))
 		}
 	},
 }
