@@ -18,7 +18,7 @@ func printTable(obj interface{}) {
 		err = json.Unmarshal(jsonBytes, &table)
 	}
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatalf("unmarshaling to convert to table: %v", err)
 	}
 
 	columns := map[string]int{}
