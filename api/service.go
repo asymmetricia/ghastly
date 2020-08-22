@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -13,19 +14,29 @@ type domain struct {
 }
 
 type Service struct {
-	Domain      string                  `json:"domain"`
-	Name        string                  `json:"name"`
-	Description string                  `json:"description"`
-	Fields      map[string]ServiceField `json:"fields"`
+	Domain      string                   `json:"domain"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	Fields      map[string]*ServiceField `json:"fields"`
 }
 
 type ServiceField struct {
+	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	Type        ServiceFieldType `json:"type"`
 	Example     interface{}      `json:"example"`
-	Values      []string         `json:"values"`
+	Values      []interface{}    `json:"values"`
 	Default     interface{}      `json:"default"`
 }
+
+type ServiceFieldType string
+
+const (
+	Number  ServiceFieldType = "number"
+	String                   = "string"
+	Boolean                  = "boolean"
+	Values                   = "values"
+)
 
 func (s *ServiceField) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewBuffer(data))
@@ -136,14 +147,9 @@ loop:
 //var _ json.Marshaler = (*ServiceField)(nil)
 var _ json.Unmarshaler = (*ServiceField)(nil)
 
-type ServiceFieldType string
-
-const (
-	Number  ServiceFieldType = "number"
-	String                   = "string"
-	Boolean                  = "boolean"
-	Values                   = "values"
-)
+func (s ServiceFieldType) String() string {
+	return string(s)
+}
 
 func (c *Client) ListServices() ([]Service, error) {
 	servicesI, err := c.RawRESTGetAs("services", nil, []domain{})
@@ -156,9 +162,33 @@ func (c *Client) ListServices() ([]Service, error) {
 		for name, svc := range domain.Services {
 			svc.Domain = domain.Domain
 			svc.Name = name
+			for name, f := range svc.Fields {
+				f.Name = name
+			}
 			ret = append(ret, svc)
 		}
 	}
 
 	return ret, nil
+}
+
+var ServiceNotFound = errors.New("not found")
+
+// GetService returns the service with the given domain and service. If the
+// service can't be retrieved, the returned service will be nil and the error
+// will be non-nil. If the service does not exist but no other error occurs,
+// an error wrapping ServiceNotFound will be returned.
+func (c *Client) GetService(domain, service string) (*Service, error) {
+	svcs, err := c.ListServices()
+	if err != nil {
+		return nil, fmt.Errorf("retrieving services list: %w", err)
+	}
+
+	for _, svc := range svcs {
+		if svc.Domain == domain && svc.Name == service {
+			return &svc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("service %q in domain %q %w", service, domain, ServiceNotFound)
 }

@@ -6,6 +6,7 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/terraform-plugin-sdk v1.12.0
+	github.com/jedib0t/go-pretty/v6 v6.0.4
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/pkg/errors v0.8.0
 	github.com/sirupsen/logrus v1.5.0
