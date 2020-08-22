@@ -139,6 +139,12 @@ var serviceCallCmd = &cobra.Command{
 	Use: "call {domain} {service} [{field}={value} … {fieldN}={valueN}]",
 	Short: "call the given service; each argument after service name should be " +
 		"a `key=value` pair, which will be passed as a field in service_data",
+	Long: "call the given service. each argument is a `key=value` pair " +
+		"passed as a field in service_data. Examples:\n\nToggle a light " +
+		"entity with ID `light.nanoleaf`:\n\tcall light toggle " +
+		"entity_id=light.nanoleaf\n\nSet the color temperature of " +
+		"light.nanoleaf to 500 mired:\n\tcall light turn_on " +
+		"entity_id=light.nanoleaf color_temp=500",
 	Args:              cobra.MinimumNArgs(2),
 	Run:               serviceCallCmd_Run,
 	ValidArgsFunction: serviceCallCmd_Complete,
@@ -194,7 +200,7 @@ func serviceCallCmd_Complete(cmd *cobra.Command, args []string, complete string)
 			cobra.ShellCompDirectiveNoSpace |
 			cobra.ShellCompDirectiveNoFileComp
 	}
-	
+
 	if field.Type == api.Values {
 		for _, v := range field.Values {
 			ret = append(ret, fmt.Sprintf("%v", v))
