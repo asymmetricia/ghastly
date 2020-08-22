@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
+
+	"github.com/sirupsen/logrus"
 )
 
 type domain struct {
@@ -14,6 +17,7 @@ type domain struct {
 }
 
 type Service struct {
+	client      *Client
 	Domain      string                   `json:"domain"`
 	Name        string                   `json:"name"`
 	Description string                   `json:"description"`
@@ -160,6 +164,7 @@ func (c *Client) ListServices() ([]Service, error) {
 	var ret []Service
 	for _, domain := range servicesI.([]domain) {
 		for name, svc := range domain.Services {
+			svc.client = c
 			svc.Domain = domain.Domain
 			svc.Name = name
 			for name, f := range svc.Fields {
@@ -191,4 +196,79 @@ func (c *Client) GetService(domain, service string) (*Service, error) {
 	}
 
 	return nil, fmt.Errorf("service %q in domain %q %w", service, domain, ServiceNotFound)
+}
+
+func (s *Service) Call(data map[string]interface{}) ([]State, error) {
+	for f, v := range data {
+		logrus.Tracef("validating %s: %v", f, v)
+		field, ok := s.Fields[f]
+		if !ok {
+			return nil, fmt.Errorf("service %s.%s does not have field %q", s.Domain, s.Name, f)
+		}
+
+		switch field.Type {
+		case String:
+			_, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("service %s.%s expects field %s to be %s, "+
+					"but %T was provided", s.Domain, s.Name, f, field.Type, v)
+			}
+		case Number:
+			_, fOk := v.(float64)
+			_, iOk := v.(int)
+			if !fOk && !iOk {
+				return nil, fmt.Errorf("service %s.%s expects field %s to be int "+
+					"or float64, but %T was provided", s.Domain, s.Name, f, v)
+			}
+		case Values:
+			found := false
+			for _, value := range field.Values {
+				if reflect.TypeOf(value) == reflect.TypeOf(v) && reflect.ValueOf(value) == reflect.ValueOf(v) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				vs, _ := json.Marshal(field.Values)
+				return nil, fmt.Errorf("service %s.%s field %s only allows "+
+					"values %s; %q was not found", s.Domain, s.Name, f, vs, v)
+			}
+		case Boolean:
+			if _, ok := v.(bool); !ok {
+				return nil, fmt.Errorf("service %s.%s expects field %s to be %s, "+
+					"but %T was provided", s.Domain, s.Name, f, field.Type, v)
+			}
+		}
+	}
+
+	res, err := s.client.Post(fmt.Sprintf("/api/services/%s/%s", s.Domain,
+		s.Name), data)
+
+	if err != nil {
+		return nil, fmt.Errorf("during POST: %w", err)
+	}
+
+	logrus.Debugf("%+v", res)
+	resObj, ok := res.(*ResultMessage)
+
+	if !ok {
+		return nil, fmt.Errorf("expected ResultMessage back from Post but got %T", res)
+	}
+
+	if !resObj.Success {
+		return nil, fmt.Errorf("service call failed: %+v", resObj.Error)
+	}
+
+	resultJson, err := json.Marshal(resObj.Result)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal result %+v as part of "+
+			"converting to []State: %w", resObj.Result, err)
+	}
+	var ret []State
+	if err := json.Unmarshal(resultJson, &ret); err != nil {
+		return nil, fmt.Errorf("could not unmarshal result JSON %s into "+
+			"[]State: %w", resultJson, err)
+	}
+
+	return ret, nil
 }

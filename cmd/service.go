@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/pdbogen/ghastly/api"
 	"github.com/sirupsen/logrus"
@@ -98,32 +100,173 @@ var serviceGetCmd = &cobra.Command{
 			return nil, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 		}
 
-		var ret []string
 		if len(args) == 0 {
-			domains := map[string]bool{}
-			for _, svc := range svcs {
-				domains[svc.Domain] = true
-			}
-			for domain := range domains {
-				ret = append(ret, domain)
-			}
-			sort.Strings(ret)
-			return ret, cobra.ShellCompDirectiveNoFileComp
+			return completeServiceDomain(svcs)
 		}
 
-		for _, svc := range svcs {
-			if args[0] == svc.Domain {
-				ret = append(ret, svc.Name)
-			}
+		r, d := completeServiceName(svcs, args[0])
+		return r, d | cobra.ShellCompDirectiveNoSpace
+
+	},
+}
+
+func completeServiceName(svcs []api.Service, domain string) ([]string, cobra.ShellCompDirective) {
+	var ret []string
+	for _, svc := range svcs {
+		if domain == svc.Domain {
+			ret = append(ret, svc.Name)
+		}
+	}
+	sort.Strings(ret)
+	return ret, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeServiceDomain(svcs []api.Service) ([]string, cobra.ShellCompDirective) {
+	domains := map[string]bool{}
+	for _, svc := range svcs {
+		domains[svc.Domain] = true
+	}
+
+	var ret []string
+	for domain := range domains {
+		ret = append(ret, domain)
+	}
+	sort.Strings(ret)
+	return ret, cobra.ShellCompDirectiveNoFileComp
+}
+
+var serviceCallCmd = &cobra.Command{
+	Use: "call {domain} {service} [{field}={value} … {fieldN}={valueN}]",
+	Short: "call the given service; each argument after service name should be " +
+		"a `key=value` pair, which will be passed as a field in service_data",
+	Args:              cobra.MinimumNArgs(2),
+	Run:               serviceCallCmd_Run,
+	ValidArgsFunction: serviceCallCmd_Complete,
+}
+
+func serviceCallCmd_Complete(cmd *cobra.Command, args []string, complete string) ([]string, cobra.ShellCompDirective) {
+	logrus.StandardLogger().SetOutput(os.Stderr)
+	client := client(cmd)
+	svcs, err := client.ListServices()
+	if err != nil {
+		logrus.WithError(err).Fatal("could not list services for tab completion")
+	}
+
+	if len(args) == 0 {
+		return completeServiceDomain(svcs)
+	}
+
+	if len(args) == 1 {
+		return completeServiceName(svcs, args[0])
+	}
+
+	var svc *api.Service
+	for _, s := range svcs {
+		if s.Domain == args[0] && s.Name == args[1] {
+			svc = &s
+			break
+		}
+	}
+
+	if svc == nil {
+		logrus.Errorf("no service %s.%s found", args[0], args[1])
+		return nil, cobra.ShellCompDirectiveError |
+			cobra.ShellCompDirectiveNoSpace |
+			cobra.ShellCompDirectiveNoFileComp
+	}
+
+	var ret []string
+	if !strings.Contains(complete, "=") {
+		for k := range svc.Fields {
+			ret = append(ret, k)
 		}
 		sort.Strings(ret)
-		return ret, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
-	},
+		return ret, cobra.ShellCompDirectiveNoFileComp |
+			cobra.ShellCompDirectiveNoSpace
+	}
+
+	fieldName := strings.SplitN(complete, "=", 2)[0]
+	field, ok := svc.Fields[fieldName]
+	if !ok {
+		logrus.Errorf("service %s.%s has no field %q", args[0], args[1],
+			fieldName)
+		return nil, cobra.ShellCompDirectiveError |
+			cobra.ShellCompDirectiveNoSpace |
+			cobra.ShellCompDirectiveNoFileComp
+	}
+	
+	if field.Type == api.Values {
+		for _, v := range field.Values {
+			ret = append(ret, fmt.Sprintf("%v", v))
+		}
+		return ret, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, 0
+}
+
+func serviceCallCmd_Run(cmd *cobra.Command, args []string) {
+	svc, err := client(cmd).GetService(args[0], args[1])
+	if err != nil {
+		logrus.WithError(err).Fatal("could not find service")
+	}
+
+	logrus.Tracef("call invoked with args %v", args)
+
+	payload := map[string]interface{}{}
+	for _, kv := range args[2:] {
+		logrus.Tracef("parsing argument %q", kv)
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) != 2 {
+			logrus.Fatalf("%q was not `key=value` pair", kv)
+		}
+
+		field, ok := svc.Fields[parts[0]]
+		if !ok {
+			logrus.Fatal("service %s.%s does not have field %q", svc.Domain, svc.Name, parts[0])
+		}
+		logrus.Tracef("found field %v", field)
+
+		switch field.Type {
+		case api.Values:
+			fallthrough
+		case api.String:
+			payload[parts[0]] = parts[1]
+		case api.Number:
+			payload[parts[0]], err = strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				logrus.WithError(err).Fatal("service %s.%s field %s is "+
+					"numeric, but could not parse %q", svc.Domain, svc.Name,
+					parts[0], parts[1])
+			}
+		case api.Boolean:
+			payload[parts[0]], err = strconv.ParseBool(parts[1])
+			if err != nil {
+				logrus.WithError(err).Fatal("service %s.%s field %s is "+
+					"boolean, but could not parse %q", svc.Domain, svc.Name,
+					parts[0], parts[1])
+			}
+		default:
+			logrus.Fatalf("field %q has unhandled type %s", field.Name, field.Type)
+		}
+	}
+
+	logrus.Tracef("calling with payload %v", payload)
+	states, err := svc.Call(payload)
+	if err != nil {
+		logrus.WithError(err).Fatalf("failed to call service %s.%s", svc.Domain, svc.Name)
+	}
+	statesJson, err := json.Marshal(states)
+	if err != nil {
+		logrus.WithError(err).Fatal("could not marshal states to JSON: %w", err)
+	}
+	fmt.Println(string(statesJson))
 }
 
 func init() {
 	serviceCmd.AddCommand(
 		serviceListCmd,
-		serviceGetCmd)
+		serviceGetCmd,
+		serviceCallCmd)
 	Root.AddCommand(serviceCmd)
 }
