@@ -57,7 +57,7 @@ jobs:
     needs: release
     strategy:
       matrix:
-        arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64]
+        arch: [linux_amd64, linux_arm, windows_amd64, darwin_amd64, darwin_arm64]
         artifact: [ghastly,terraform-provider-homeassistant]
     steps:
     - name: download ${{matrix.artifact}}.${{matrix.arch}}
