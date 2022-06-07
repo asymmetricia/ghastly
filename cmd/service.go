@@ -229,7 +229,7 @@ func serviceCallCmd_Run(cmd *cobra.Command, args []string) {
 
 		field, ok := svc.Fields[parts[0]]
 		if !ok {
-			logrus.Fatal("service %s.%s does not have field %q", svc.Domain, svc.Name, parts[0])
+			logrus.Fatalf("service %s.%s does not have field %q", svc.Domain, svc.Name, parts[0])
 		}
 		logrus.Tracef("found field %v", field)
 
@@ -241,14 +241,14 @@ func serviceCallCmd_Run(cmd *cobra.Command, args []string) {
 		case api.Number:
 			payload[parts[0]], err = strconv.ParseFloat(parts[1], 64)
 			if err != nil {
-				logrus.WithError(err).Fatal("service %s.%s field %s is "+
+				logrus.WithError(err).Fatalf("service %s.%s field %s is "+
 					"numeric, but could not parse %q", svc.Domain, svc.Name,
 					parts[0], parts[1])
 			}
 		case api.Boolean:
 			payload[parts[0]], err = strconv.ParseBool(parts[1])
 			if err != nil {
-				logrus.WithError(err).Fatal("service %s.%s field %s is "+
+				logrus.WithError(err).Fatalf("service %s.%s field %s is "+
 					"boolean, but could not parse %q", svc.Domain, svc.Name,
 					parts[0], parts[1])
 			}
