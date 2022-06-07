@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/pdbogen/ghastly/api"
+	"github.com/asymmetricia/ghastly/api"
 )
 
 func Provider() *schema.Provider {

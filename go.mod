@@ -1,4 +1,4 @@
-module github.com/pdbogen/ghastly
+module github.com/asymmetricia/ghastly
 
 go 1.13
 

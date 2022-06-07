@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pdbogen/ghastly/cmd"
+	"github.com/asymmetricia/ghastly/cmd"
 )
 
 func main() {

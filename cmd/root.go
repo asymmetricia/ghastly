@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/pdbogen/ghastly/api"
+	"github.com/asymmetricia/ghastly/api"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -14,7 +14,7 @@ var Root = &cobra.Command{
 	Short: "ghastly is a tool for interacting with homeassistant",
 	Long: "A pretty incomplete tool for interacting with HomeAssistant. Mainly intended for exploring the API and " +
 		"providing a test bed for the /api/ package. Future hopes includes developing a Terraform provider for " +
-		"HomeAssistant.\n\nDownloads available on the GitHub Releases page: https://github.com/pdbogen/ghastly/releases",
+		"HomeAssistant.\n\nDownloads available on the GitHub Releases page: https://github.com/asymmetricia/ghastly/releases",
 }
 
 var completion = &cobra.Command{

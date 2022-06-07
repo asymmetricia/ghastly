@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pdbogen/ghastly/api"
+	"github.com/asymmetricia/ghastly/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"strings"

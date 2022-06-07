@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/pdbogen/ghastly/cmd"
+	"github.com/asymmetricia/ghastly/cmd"
 	"github.com/spf13/cobra/doc"
 )
 

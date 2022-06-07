@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pdbogen/ghastly/search"
+	"github.com/asymmetricia/ghastly/search"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

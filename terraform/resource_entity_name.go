@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/pdbogen/ghastly/api"
+	"github.com/asymmetricia/ghastly/api"
 )
 
 func resourceEntityName() *schema.Resource {
