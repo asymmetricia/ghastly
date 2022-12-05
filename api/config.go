@@ -193,11 +193,25 @@ func (c *Client) SetFlow(id ConfigFlowId, payload map[string]interface{}) (resul
 	return "", errors.New("flow Result was empty")
 }
 
+func (c *Client) StartFlow(handler string) (*ConfigFlow, error) {
+	return c.startFlow(handler, false)
+}
+
 // StartOptionsFlow initiates a options flow with the given handler, usually (always?) a ConfigEntry id. The new flow
-//is returned. The UI calls DELETE if a thus-created flow is not used. It's not clear to me what happens if you don't do
+// is returned. The UI calls DELETE if a thus-created flow is not used. It's not clear to me what happens if you don't do
 // this.
 func (c *Client) StartOptionsFlow(entryId EntryId) (*ConfigFlow, error) {
-	obj, err := process(c.Post("config/config_entries/options/flow", map[string]string{"handler": string(entryId)}))
+	return c.startFlow(string(entryId), true)
+}
+
+func (c *Client) startFlow(handler string, options bool) (*ConfigFlow, error) {
+	var obj any
+	var err error
+	if options {
+		obj, err = process(c.Post("config/config_entries/options/flow", map[string]string{"handler": handler}))
+	} else {
+		obj, err = process(c.Post("config/config_entries/flow", map[string]string{"handler": handler}))
+	}
 	flowI, err := convert(obj, (*ConfigFlow)(nil), err)
 	if err != nil {
 		return nil, fmt.Errorf("POSTing start-flow: %v", err)
