@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -129,9 +130,9 @@ type ConfigFlow struct {
 	Type                    string                 `json:"type"`
 
 	// These fields appear in the response to SetFlow, maybe based on `Type`?
-	Description string `json:"description,omitempty"`
-	Result      string `json:"result,omitempty"`
-	Title       string `json:"title,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	Title       string          `json:"title,omitempty"`
 }
 
 type ConfigFlowDataSchema struct {
@@ -187,10 +188,16 @@ func (c *Client) SetFlow(id ConfigFlowId, payload map[string]interface{}) (resul
 		return "", fmt.Errorf("server responsed with error: %s", strings.Join(errs, "; "))
 	}
 
-	if flow.Result != "" {
-		return flow.Result, nil
+	if len(flow.Result) == 0 {
+		return "", errors.New("flow Result was empty")
 	}
-	return "", errors.New("flow Result was empty")
+
+	var s string
+	if err := json.Unmarshal(flow.Result, &s); err == nil {
+		return s, nil
+	}
+
+	return string(flow.Result), nil
 }
 
 func (c *Client) StartFlow(handler string) (*ConfigFlow, error) {
@@ -239,4 +246,20 @@ func (c *Client) ListFlowHandlers() ([]string, error) {
 		return nil, err
 	}
 	return handlers.([]string), nil
+}
+
+type DeleteEntryResponse struct {
+	RequireRestart bool `json:"require_restart"`
+}
+
+func (c *Client) DeleteEntry(id EntryId) (*DeleteEntryResponse, error) {
+	res, err := c.RawRESTDeleteAs(
+		fmt.Sprintf("api/config/config_entries/entry/%s", string(id)),
+		nil,
+		(*DeleteEntryResponse)(nil),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*DeleteEntryResponse), nil
 }

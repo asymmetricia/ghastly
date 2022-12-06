@@ -30,7 +30,7 @@ func convert(obj interface{}, prototype interface{}, err error) (interface{}, er
 	ob, _ := json.Marshal(obj)
 	ret := reflect.New(reflect.TypeOf(prototype)).Interface()
 	if err := json.Unmarshal(ob, &ret); err != nil {
-		return nil, fmt.Errorf("could not convert response to %T: %v", ret, err)
+		return nil, fmt.Errorf("could not convert response %q to %T: %v", ob, ret, err)
 	}
 
 	return reflect.Indirect(reflect.ValueOf(ret)).Interface(), nil

@@ -77,6 +77,17 @@ var configSetFlowCmd = &cobra.Command{
 	Short: "set the given key-value pairs on the flow with the given ID",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		handler, _ := cmd.Flags().GetBool("handler")
+
+		if handler {
+			ret, err := client(cmd).StartFlow(args[0])
+			if err != nil {
+				logrus.WithError(err).Fatal("start-flow failed")
+			}
+			logrus.Debugf("started flow %+v", ret)
+			args[0] = string(ret.FlowId)
+		}
+
 		log := logrus.WithField("flow_id", args[0])
 		id := api.ConfigFlowId(args[0])
 		kv := map[string]string{}
@@ -161,6 +172,34 @@ var configStartOptionsFlowCmd = &cobra.Command{
 	},
 }
 
+var configStartFlowCmd = &cobra.Command{
+	Use:   "start-flow [handler-name]",
+	Short: "start a config flow with with the given handler name as the handler, e.g., to configure a new integration",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ret, err := client(cmd).StartFlow(args[0])
+		if err != nil {
+			logrus.WithError(err).Fatal("start-flow failed")
+		}
+		retJson, _ := json.Marshal(ret)
+		fmt.Println(string(retJson))
+	},
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		entries, err := client(cmd).ListFlowHandlers()
+		if err != nil {
+			logrus.WithError(err).Error("could not list config entries")
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var ret []string
+		for _, entry := range entries {
+			if strings.HasPrefix(entry, toComplete) {
+				ret = append(ret, entry)
+			}
+		}
+		return ret, cobra.ShellCompDirectiveNoFileComp
+	},
+}
+
 var configGetOptionsFlowCmd = &cobra.Command{
 	Use:   "get-options-flow [flow-id]",
 	Short: "retrieve the current state of the indicated options flow",
@@ -203,14 +242,33 @@ var configListFlowHandlersCmd = &cobra.Command{
 	},
 }
 
+var configDeleteEntryCmd = &cobra.Command{
+	Use:   "delete-entry [entry-id]",
+	Short: "delete the entry with the given ID",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ret, err := client(cmd).DeleteEntry(api.EntryId(args[0]))
+		if err != nil {
+			logrus.WithError(err).Fatal("could not delete entry")
+		}
+		retJson, _ := json.Marshal(ret)
+		fmt.Println(string(retJson))
+	},
+}
+
 func init() {
-	configCmd.AddCommand(configListEntriesCmd,
+	configSetFlowCmd.Flags().Bool("handler", false, "if true, flow-id is interpreted as a handler "+
+		"name, and the handler is started and then set in a single step")
+	configCmd.AddCommand(
+		configListEntriesCmd,
 		configListFlowHandlersCmd,
 		configListFlowsCmd,
 		configGetFlowCmd,
 		configGetConfigCmd,
 		configGetOptionsFlowCmd,
 		configSetFlowCmd,
-		configStartOptionsFlowCmd)
+		configStartFlowCmd,
+		configStartOptionsFlowCmd,
+		configDeleteEntryCmd)
 	Root.AddCommand(configCmd)
 }
